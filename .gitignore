@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.ruff_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Distribution
+dist/
+build/
+
+# Local development settings
+.env
+.env.local
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Mac
+.DS_Store
