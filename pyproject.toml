@@ -1,0 +1,18 @@
+[project]
+name = "s-layerwise-cosine-aggregation"
+version = "0.1.0"
+description = "Code for \"Improving Byzantine Resilience via layerwise aggregation and cosine distance\""
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flexclash>=0.0.3",
+    "flexible-fl>=0.7.0",
+    "tensorboard>=2.19.0",
+    "torch>=2.7.0",
+    "torchvision>=0.22.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.10",
+]

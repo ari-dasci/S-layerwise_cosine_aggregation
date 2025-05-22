@@ -12,7 +12,7 @@ from flex.pool.decorators import (
     deploy_server_model,
     set_aggregated_weights,
 )
-from flexclash.pool import bulyan, multikrum
+from flexclash.pool import bulyan, multikrum as clash_mk
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -46,7 +46,7 @@ device = "cuda"
 n_gpus = torch.cuda.device_count()
 
 round = 0
-krum = partial(multikrum, m=1)
+krum = partial(clash_mk, m=1)
 
 
 parser = argparse.ArgumentParser(description="Federated Learning with Krum Aggregation")
@@ -225,9 +225,9 @@ clean_ids = list(flex_dataset.keys())
 poisoned_ids = []
 
 if args.labelflipping or args.layergaussian or args.little:
-    assert (
-        POISONED_PER_ROUND > 0
-    ), "Using an attack requires at least one poisoned client per round"
+    assert POISONED_PER_ROUND > 0, (
+        "Using an attack requires at least one poisoned client per round"
+    )
     if args.labelflipping:
         if (
             args.dataset == "celeba"
@@ -501,9 +501,10 @@ def train_base(pool: FlexPool, n_rounds=100):
 
         if args.persistclients:
             metrics = selected_clean_clients.select(3).map(obtain_metrics)
-            acc, loss = sum([m[1] for m in metrics]) / len(metrics), sum(
-                [m[0] for m in metrics]
-            ) / len(metrics)
+            acc, loss = (
+                sum([m[1] for m in metrics]) / len(metrics),
+                sum([m[0] for m in metrics]) / len(metrics),
+            )
         else:
             loss, acc = pool.servers.map(obtain_metrics)[0]
 

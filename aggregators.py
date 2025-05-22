@@ -176,7 +176,7 @@ def krum_cosine_similarity_layerwise(
     param_shapes = [param.shape for param in list_of_weights[0]]
     selected_weights = []
     for param, shape in zip(selected_update, param_shapes):
-        assert type(param) == torch.Tensor, f"param is not a tensor: {param}"
+        assert type(param) is torch.Tensor, f"param is not a tensor: {param}"
         param = param.view(shape)
         selected_weights.append(param)
 
