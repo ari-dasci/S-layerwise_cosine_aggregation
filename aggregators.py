@@ -20,11 +20,73 @@ def layerwise_krum(weights: List[List[tl.tensor]], f: int = 1):
 
 
 @aggregate_weights
+def layerwise_multikrum(weights: List[List[tl.tensor]], f: int = 1, m: int = 5):
+    return [
+        multikrum.__wrapped__([[weights[j][i]] for j in range(len(weights))], m=m, f=f)[
+            0
+        ]
+        for i in range(len(weights[0]))
+    ]
+
+
+@aggregate_weights
 def layerwise_bulyan(weights: List[List[tl.tensor]], f: int = 1, m: int = 5):
     return [
         bulyan.__wrapped__([[weights[j][i]] for j in range(len(weights))], m=m, f=f)[0]
         for i in range(len(weights[0]))
     ]
+
+
+def _group_by_block_efficient(state_dict: Dict[str, torch.Tensor]):
+    group_regexes = [r"features\.\d\.\d\.block\.*"]
+    group_regex = re.compile(group_regexes[0])
+    groups = {}
+    before = []
+    after = []
+    for name in state_dict:
+        match = group_regex.match(name)
+        if match is None:
+            if len(groups) == 0:
+                before.append(state_dict[name])
+            else:
+                after.append(state_dict[name])
+        else:
+            group = match.string[match.start() : match.end()]
+            if group not in groups:
+                groups[group] = []
+            groups[group].append(state_dict[name])
+    groups["before"] = before
+    groups["after"] = after
+    return groups
+
+
+@collect_clients_weights
+def get_clients_weights_celeba_blockwise(client_flex_model: FlexModel):
+    weight_dict = client_flex_model["model"].state_dict()
+    server_dict = client_flex_model["server_model"].state_dict()
+    dev = [weight_dict[name] for name in weight_dict][0].get_device()
+    dev = "cpu" if dev == -1 else "cuda"
+    state = {
+        name: (weight_dict[name] - server_dict[name].to(dev)).type(torch.float)
+        for name in weight_dict
+    }
+
+    return _group_by_block_efficient(state)
+
+
+@aggregate_weights
+def blockwise_krum(weights: List[Dict[str, tl.tensor]]):
+    before = [weight["before"] for weight in weights]
+    after = [weight["after"] for weight in weights]
+    ids = [name for name in weights[0] if name != "before" and name != "after"]
+
+    before: List[tl.tensor] = multikrum.__wrapped__(before, m=1)
+    after: List[tl.tensor] = multikrum.__wrapped__(after, m=1)
+    the_rest: List[List[tl.tensor]] = [
+        multikrum.__wrapped__([weight[name] for weight in weights], m=1) for name in ids
+    ]
+    the_rest = list(reduce(lambda x, y: x + y, the_rest, []))
+    return before + the_rest + after
 
 
 def _krum_cosine_similarity(
@@ -56,13 +118,38 @@ def _krum_cosine_similarity(
 
 @aggregate_weights
 def krum_cosine_similarity(list_of_weights: List[List[torch.Tensor]], f: int = 1):
+    # Flatten and stack the weights from each model
     flattened_weights = [
         torch.cat([torch.flatten(param) for param in model_weights])
         for model_weights in list_of_weights
     ]
 
+    # Call the original Krum function
     selected_update = list_of_weights[
         _krum_cosine_similarity(flattened_weights, f).item()
+    ]
+
+    return selected_update
+
+
+@aggregate_weights
+def multikrum_cosine_similarity(
+    list_of_weights: List[List[torch.Tensor]], f: int = 1, m: int = 5
+):
+    # Flatten and stack the weights from each model
+    flattened_weights = [
+        torch.cat([torch.flatten(param) for param in model_weights])
+        for model_weights in list_of_weights
+    ]
+
+    # Call the original Krum function
+    selected_indexes = _krum_cosine_similarity(flattened_weights, f, m)
+    selected_updates = [list_of_weights[i] for i in selected_indexes]
+
+    # Average the selected updates
+    selected_update = [
+        torch.mean(torch.stack([update[i] for update in selected_updates]), dim=0)
+        for i in range(len(list_of_weights[0]))
     ]
 
     return selected_update
@@ -85,6 +172,7 @@ def krum_cosine_similarity_layerwise(
         for i in range(len(list_of_weights[0]))
     ]
 
+    # Reconstruct the weights into the original parameter shapes
     param_shapes = [param.shape for param in list_of_weights[0]]
     selected_weights = []
     for param, shape in zip(selected_update, param_shapes):
@@ -93,6 +181,20 @@ def krum_cosine_similarity_layerwise(
         selected_weights.append(param)
 
     return selected_weights
+
+
+@aggregate_weights
+def multikrum_cosine_similarity_layerwise(
+    list_of_weights: List[List[torch.Tensor]], f: int = 1, m: int = 5
+):
+    updates = [
+        multikrum_cosine_similarity.__wrapped__(
+            [[list_of_weights[j][i]] for j in range(len(list_of_weights))], f=f, m=m
+        )[0]
+        for i in range(len(list_of_weights[0]))
+    ]
+
+    return updates
 
 
 def _bulyan_cosine_similarity(

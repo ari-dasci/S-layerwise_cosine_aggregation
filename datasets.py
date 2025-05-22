@@ -10,7 +10,7 @@ def get_dataset(dataset: str) -> Tuple[FedDataset, Dataset]:
     match dataset:
         case "emnist_non_iid":
             return _emnist_non_iid()
-        case "mnist":
+        case "mnist" | "mnist_mlp":
             return _emnist_iid()
         case "fashion":
             return _fashion_emnist()
@@ -18,8 +18,10 @@ def get_dataset(dataset: str) -> Tuple[FedDataset, Dataset]:
             return _fashion_non_iid()
         case "celeba_iid":
             return _celeba_iid()
-        case "celeba":
+        case "celeba" | "celeba_different":
             return _celeba_non_iid()
+        case "celeba_attractive":
+            return celeba_non_iid_attractive()
         case "cifar_10":
             return _cifar_10_iid()
         case _:
@@ -169,6 +171,37 @@ def _celeba_non_iid():
         )
 
         y_data = [np.eye(2)[label[smiling_index]] for label in y_data]
+        return Dataset(X_data=dataset.X_data, y_data=y_data)
+
+    flex_dataset = flex_dataset.apply(select_label)
+    test_data = select_label(test_data)
+
+    return flex_dataset, test_data
+
+
+def celeba_non_iid_attractive():
+    import dill as pickle
+    from flex.datasets.federated_datasets import federated_celeba
+
+    try:
+        with open("celeba_fed.pck", "rb") as f:
+            flex_dataset = pickle.load(f)
+        with open("celeba_test.pck", "rb") as f:
+            test_data = pickle.load(f)
+    except FileNotFoundError:
+        flex_dataset, test_data = federated_celeba("..", return_test=True)
+        pickle.dump(flex_dataset, open("celeba_fed.pck", "wb"))
+        pickle.dump(test_data, open("celeba_test.pck", "wb"))
+
+    def select_label(dataset: Dataset):
+        attractive_index = 2
+        y_data = (
+            [y[1] for y in dataset.y_data]
+            if isinstance(dataset.y_data[0], tuple)
+            else dataset.y_data
+        )
+
+        y_data = [np.eye(2)[label[attractive_index]] for label in y_data]
         return Dataset(X_data=dataset.X_data, y_data=y_data)
 
     flex_dataset = flex_dataset.apply(select_label)
